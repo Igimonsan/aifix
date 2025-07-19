@@ -31,6 +31,23 @@ router.post('/', async (req, res) => {
                 message: 'prompt cannot be empty'
             });
         }
+
+        // 🆕 FITUR BARU: Cek jika prompt adalah perintah reset
+        const resetCommands = ['/reset', '/clear', '/hapus', 'reset memori', 'hapus riwayat'];
+        const isResetCommand = resetCommands.some(cmd => 
+            prompt.toLowerCase().trim().includes(cmd.toLowerCase())
+        );
+
+        if (isResetCommand) {
+            memoryService.clearUserConversation(userId);
+            return res.json({
+                success: true,
+                userId: userId,
+                response: "Riwayat percakapan Anda telah dihapus! Mari mulai percakapan baru.",
+                action: "memory_reset",
+                timestamp: new Date().toISOString()
+            });
+        }
         
         console.log(`📨 Received request from user: ${userId}`);
         console.log(`💬 Prompt: ${prompt.substring(0, 100)}...`);
@@ -124,11 +141,13 @@ router.delete('/history/:userId', (req, res) => {
             });
         }
         
+        const hadHistory = memoryService.getConversation(userId).length > 0;
         memoryService.clearUserConversation(userId);
         
         res.json({
             success: true,
-            message: `Conversation history for user ${userId} has been cleared`
+            message: `Conversation history for user ${userId} has been cleared`,
+            previousMessages: hadHistory ? 'existed' : 'none'
         });
         
     } catch (error) {
@@ -136,6 +155,88 @@ router.delete('/history/:userId', (req, res) => {
         res.status(500).json({
             error: 'Internal Server Error',
             message: 'Failed to clear conversation history'
+        });
+    }
+});
+
+// 🆕 DELETE /ask/history - Hapus SEMUA riwayat percakapan (admin only)
+router.delete('/history', (req, res) => {
+    try {
+        const { adminKey } = req.body;
+        
+        // Simple admin protection - ganti dengan sistem auth yang proper
+        if (adminKey !== process.env.ADMIN_KEY && adminKey !== 'admin123') {
+            return res.status(403).json({
+                error: 'Forbidden',
+                message: 'Admin access required'
+            });
+        }
+        
+        const stats = memoryService.getStats();
+        memoryService.clearAllConversations();
+        
+        res.json({
+            success: true,
+            message: 'All conversation histories have been cleared',
+            clearedStats: stats
+        });
+        
+    } catch (error) {
+        console.error('❌ Error clearing all histories:', error.message);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to clear all conversation histories'
+        });
+    }
+});
+
+// 🆕 GET /ask/stats - Statistik memory usage
+router.get('/stats', (req, res) => {
+    try {
+        const stats = memoryService.getStats();
+        res.json({
+            success: true,
+            stats: stats
+        });
+    } catch (error) {
+        console.error('❌ Error getting stats:', error.message);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to retrieve statistics'
+        });
+    }
+});
+
+// 🆕 POST /ask/reset - Alternative reset endpoint (lebih user-friendly)
+router.post('/reset', (req, res) => {
+    try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: 'userId is required'
+            });
+        }
+        
+        const hadHistory = memoryService.getConversation(userId).length > 0;
+        memoryService.clearUserConversation(userId);
+        
+        res.json({
+            success: true,
+            userId: userId,
+            message: hadHistory 
+                ? "Riwayat percakapan berhasil dihapus. Mari mulai dari awal!" 
+                : "Belum ada riwayat untuk dihapus. Siap memulai percakapan baru!",
+            action: "memory_reset",
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        console.error('❌ Error in reset endpoint:', error.message);
+        res.status(500).json({
+            error: 'Internal Server Error',
+            message: 'Failed to reset conversation'
         });
     }
 });
