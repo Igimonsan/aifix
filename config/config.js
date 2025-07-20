@@ -9,7 +9,7 @@ module.exports = {
     OPENROUTER: {
         API_KEY: process.env.OPENROUTER_API_KEY,
         BASE_URL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-        MODEL_NAME: process.env.MODEL_NAME || 'mistralai/mistral-7b-instruct'
+        MODEL_NAME: process.env.MODEL_NAME || 'google/gemini-2.0-flash-exp:free'
     },
     
     // Konfigurasi memory
